@@ -62,5 +62,7 @@ function main(soName, offset) {
 }
 
 setImmediate(function () {
-    main("libaes.so", 0x274DC)
+    main("libnative-lib.so", 0x26058)
 });
+
+// frida -H 127.0.0.1:1234 -F -l so_func_instr_tracer.js
