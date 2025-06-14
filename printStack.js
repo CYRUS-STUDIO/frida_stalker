@@ -1,19 +1,16 @@
 function getModuleByAddressSafe(address) {
     try {
         // 尝试获取模块
-        var module = Process.getModuleByAddress(address);
-
+        let module = Process.getModuleByAddress(address);
         // 如果模块存在，返回模块
         if (module) {
             return module;
-        } else {
-            // 如果没有找到模块，返回 null
-            return null;
         }
+        // 如果没有找到模块，返回 null
     } catch (e) {
         // 捕获异常，返回 null
-        return null;
     }
+    return null;
 }
 
 function main() {
