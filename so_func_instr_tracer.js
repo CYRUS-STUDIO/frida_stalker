@@ -16,8 +16,13 @@ function getModuleByAddressSafe(address) {
     }
 }
 
-
-function main(soName, offset) {
+/**
+ * 跟踪指令执行
+ *
+ * @param soName 目标模块名称
+ * @param offset 函数偏移
+ */
+function trace(soName, offset) {
     var baseAddress = Module.findBaseAddress(soName);
     var targetAddr = baseAddress.add(offset);
 
@@ -62,7 +67,7 @@ function main(soName, offset) {
 }
 
 setImmediate(function () {
-    main("libnative-lib.so", 0x26058)
+    trace("libnative-lib.so", 0x26058)
 });
 
 // frida -H 127.0.0.1:1234 -F -l so_func_instr_tracer.js

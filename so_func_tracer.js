@@ -44,12 +44,12 @@ function getDiffRegisters(context, lastRegs) {
 
 
 /**
- * 指令跟踪
+ * 跟踪指令执行和寄存器变化
  *
- * @param targetModuleName 目标模块名
+ * @param targetModuleName 目标模块名称
  * @param targetSymbol 函数偏移（或导出名）
  */
-function trace(targetModuleName, targetSymbol) {
+function traceInstructionAndRegisters(targetModuleName, targetSymbol) {
 
     // 获取模块基地址
     const base = Module.findBaseAddress(targetModuleName);
@@ -154,7 +154,7 @@ function trace(targetModuleName, targetSymbol) {
 
 
 setImmediate(function () {
-    trace("libnative-lib.so", 0x26058)
+    traceInstructionAndRegisters("libnative-lib.so", 0x26058)
 });
 
 
