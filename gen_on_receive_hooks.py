@@ -58,8 +58,6 @@ setImmediate(main);
 """)
 
 def sanitize_varname(modname):
-    # make a valid JS variable name from module name
-    # e.g. librsig.so -> base_librsig_so
     v = re.sub(r'[^0-9a-zA-Z_]', '_', modname)
     if re.match(r'^[0-9]', v):
         v = '_' + v
@@ -68,33 +66,41 @@ def sanitize_varname(modname):
 def parse_to_entries(text):
     """
     Parse in-file occurrences of "to: 0xADDR | modulename | 0xOFFSET"
-    Return list of tuples in original order: [(mod, offset), ...]
+    Only consider lines that contain '[call]' (case-insensitive).
+    Return list of tuples in original order: [(mod, offset, orig_line), ...]
     """
-    # pattern matches 'to: 0xADDR | modulename | 0xOFFSET' or variations with spaces
-    pattern = re.compile(r'\bto:\s*(0x[0-9a-fA-F]+)\s*\|\s*([^\s|]+)\s*\|\s*(0x[0-9a-fA-F]+)')
+    pattern = re.compile(r'\bto:\s*(0x[0-9a-fA-F]+)\s*\|\s*([^\s|]+)\s*\|\s*(0x[0-9a-fA-F]+)', re.IGNORECASE)
     entries = []
-    for m in pattern.finditer(text):
-        # addr_str = m.group(1)  # full address if needed
-        mod = m.group(2)
-        off = m.group(3).lower()
-        entries.append((mod, off))
+    for line in text.splitlines():
+        if '[call]' not in line.lower():
+            continue  # skip non-call lines (including [ret])
+        m = pattern.search(line)
+        if m:
+            mod = m.group(2)
+            off = m.group(3).lower()
+            orig = line.strip()
+            entries.append((mod, off, orig))
     return entries
 
 def unique_preserve_order(entries):
+    """
+    entries: list of (mod, off, orig_line)
+    returns deduped list preserving first occurrence order
+    """
     seen = set()
     out = []
-    for mod, off in entries:
+    for mod, off, orig in entries:
         key = (mod, off)
         if key in seen:
             continue
         seen.add(key)
-        out.append((mod, off))
+        out.append((mod, off, orig))
     return out
 
 def gen_js(src_path: Path, ordered_entries):
     # collect unique modules preserving first-appearance order
     mods_in_order = []
-    for mod, _ in ordered_entries:
+    for mod, _, _ in ordered_entries:
         if mod not in mods_in_order:
             mods_in_order.append(mod)
 
@@ -102,18 +108,18 @@ def gen_js(src_path: Path, ordered_entries):
     base_lines = []
     for mod in mods_in_order:
         var = sanitize_varname(mod)
-        # keep as Module.findBaseAddress("mod")
         base_lines.append(f"    var {var} = Module.findBaseAddress(\"{mod}\");")
-    base_block = "\n".join(base_lines)
+    base_block = "\n".join(base_lines) if base_lines else "    // no modules found"
 
-    # build hook calls in original order
+    # build hook calls in original order, using the original matched line as comment
     hook_lines = []
-    for mod, off in ordered_entries:
+    for mod, off, orig in ordered_entries:
         var = sanitize_varname(mod)
-        # use base.add(hex) style
-        # hook_lines.append(f"    // module: {mod}  offset: {off}")
+        # Escape '/*' and '*/' defensively to avoid breaking comment blocks
+        safe_comment = orig.replace("/*", "/ *").replace("*/", "* /")
+        hook_lines.append(f"    // {safe_comment}")
         hook_lines.append(f"    hookNativeAddr({var}.add({off}));")
-    hook_block = "\n".join(hook_lines)
+    hook_block = "\n".join(hook_lines) if hook_lines else "    // no hooks generated"
 
     main = MAIN_TMPL.substitute(base_vars=base_block, hook_calls=hook_block)
     full = JS_HEADER.substitute(src=str(src_path)) + main
@@ -132,7 +138,7 @@ def main():
     text = in_path.read_text(encoding='utf-8', errors='ignore')
     entries = parse_to_entries(text)
     if not entries:
-        print("No 'to:' entries found in file.")
+        print("No '[call]' to:' entries found in file.")
         sys.exit(0)
 
     ordered = unique_preserve_order(entries)
@@ -142,8 +148,8 @@ def main():
     out_path.write_text(js_text, encoding='utf-8')
     print("Generated:", out_path)
     print("Entries (in order):")
-    for mod, off in ordered:
-        print(f"  {mod} {off}")
+    for mod, off, orig in ordered:
+        print(f"  {mod} {off}  // {orig}")
 
 if __name__ == "__main__":
     main()
