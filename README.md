@@ -1,48 +1,48 @@
 > 版权归作者所有，如有转发，请注明文章出处：<https://cyrus-studio.github.io/blog/>
 
-# **前言**
+# 前言
 
 
 
-比如我们像分析某个 so 中偏移为  0x23AD0 的加密函数
+在移动应用的安全加固中，**OLLVM（Obfuscator-LLVM）**  是一种常见的代码混淆与保护手段。它通过控制流平坦化、虚假控制流、指令替换等方式，使逆向分析者很难直接还原出原始算法逻辑。
 
 
 
-IDA 反汇编 so，可以看到 so 中该函数做了混淆
+然而，通过 Frida 提供的 **Stalker**  模块去动态分析让我们有机会对 OLLVM 的“黑盒逻辑”进行还原。
+
+
+
+通过 Stalker 的指令级追踪能力，我们不仅能捕获 **函数调用** 、记录 **调用参数** ，还可以打印 **调用堆栈** ，最终逐步揭开 OLLVM 加固算法的真实运行流程。
+
+
+
+比如，分析某个 so 中偏移为  0x23AD0 的加密函数。使用 IDA 反汇编 so，可以看到 so 中该函数做了混淆
 
 
 
 ![word/media/image1.png](https://gitee.com/cyrus-studio/images/raw/master/67a623e949b405628e3a6988a4a4f38a.png)
 
 
-控制流平坦化
+使用了控制流平坦化混淆
 
 
 
 ![word/media/image2.png](https://gitee.com/cyrus-studio/images/raw/master/2833883961c7d1298e9bc068228714c4.png)
 
 
-# **Frida Stalker**
+# Frida Stalker
 
 
 
-Frida 的 Stalker 是一个强大的代码追踪工具。
+**Frida Stalker**  是 Frida 提供的一个强大的指令级追踪引擎，它能够在目标进程运行时，动态捕获每一条指令的执行情况。与传统的函数级 hook 不同，Stalker 可以深入到 **原生汇编层面** ，追踪寄存器变化、内存访问、函数调用关系等底层细节。
 
 
 
-主要功能
+相关链接：
 
-1. 指令级跟踪：Stalker 可精确到指令级别，对应用的原生代码进行实时监控。
+- Stalker 介绍：[https://frida.re/docs/stalker/](https://frida.re/docs/stalker/)
 
-1. 代码插桩：支持在指定指令前后插入自定义的代码逻辑。
-
-1. 内存访问监控：可以监视内存读写操作，分析数据流向。
-
-1. 自定义回调：提供回调函数，方便记录和分析执行轨迹。
-
-
-
-文档：[https://frida.re/docs/javascript-api/#stalker](https://frida.re/docs/javascript-api/#stalker)
+- api 文档：[https://frida.re/docs/javascript-api/#stalker](https://frida.re/docs/javascript-api/#stalker)
 
 
 
@@ -51,43 +51,31 @@ Frida 的 Stalker 是一个强大的代码追踪工具。
 
 
 ![word/media/image3.png](https://gitee.com/cyrus-studio/images/raw/master/db534ee780918e2346c42cf76bcedfed.png)
-[https://frida.re/docs/stalker/](https://frida.re/docs/stalker/)
+
+
+# onCallSummary（函数调用摘要)
 
 
 
-关于 Frida 的使用可以参考这篇文章：[使用 Frida Hook Android App](https://cyrus-studio.github.io/blog/posts/%E4%BD%BF%E7%94%A8-frida-hook-android-app/)
+**onCallSummary**  是 Frida Stalker 提供的一个回调方法，用于在 **函数调用层面**  对收集到的执行数据进行归纳和统计。
 
 
 
-## **onCallSummary（函数调用摘要)**
+它会将某一段追踪区间内的 **调用信息进行汇总** ，例如：
+
+- 哪些函数被调用了
+
+- 每个函数被调用了多少次
+
+- 调用分布和频率
 
 
 
-onCallSummary 用于返回函数调用的摘要信息。
+简而言之，onCallSummary 像是 **函数调用的统计报表** ，让你能在混淆代码的“噪音”中看清主干逻辑。
 
 
 
-Stalker.follow() 使用 onCallSummary 时，不会实时回调，而是在合适的时间点返回已汇总的调用信息。
-
-
-
-通常是在：
-
-- 函数执行结束后
-
-- 线程空闲或上下文切换时
-
-- Stalker缓冲区达到一定大小时
-
-- Stalker.flush();
-
-
-
-因此，你会在目标函数执行完毕后，看到 onCallSummary 输出的调用信息。
-
-
-
-summary 数据结构通常类似于以下格式：
+返回数据的结构（summary）通常类似于以下格式：
 
 ```
 {
@@ -188,11 +176,29 @@ Call Summary:
 ```
 
 
-## **onReceive（接收捕获的事件）**
+# onReceive（接收捕获的事件）
 
 
 
-onReceive 在 Stalker 捕获到事件后被调用，它会以批量形式传递事件数据，通常用于实时分析或记录。
+**onReceive**  是 Frida Stalker 的另一个重要回调方法，用于 **逐条接收捕获到的事件** 。与 onCallSummary 不同，它不会进行统计汇总，而是将底层指令级别的执行轨迹实时发送到回调中。
+
+
+
+在 onReceive 中，你能拿到最原始的 **执行事件数据** ，例如：
+
+- 每条指令的执行地址
+
+- 寄存器变化
+
+- 内存读写行为
+
+- 调用的目标函数地址
+
+
+
+简而言之，onReceive 就像一台 **显微镜** ，能把程序的执行过程逐步展现出来，配合 
+
+onCallSummary 的宏观视角，二者结合能更高效地对抗复杂的代码混淆与保护机制。
 
 
 
@@ -206,7 +212,7 @@ ret,0x7890000e34,0x788ff64e68,2
 ```
 
 
-跟踪 call 和 ret 事件 并打印日志：
+比如，跟踪 call 和 ret 事件 并打印日志：
 
 ```
 function getModuleByAddressSafe(address) {
@@ -419,17 +425,15 @@ onReceive 事件数量: 390
 ![word/media/image6.png](https://gitee.com/cyrus-studio/images/raw/master/69527ac7048bd6f720ccc1c316457c47.png)
 
 
-
-
-# **hook 所有 call 参数分析**
+# hook 所有 call 分析参数
 
 
 
-把所有调用到的函数 hook 分析一下
+把所有调用到的函数 hook 分析一下；
 
-去掉一些系统 api 的 hook
+去掉一些系统 api 的 hook；
 
-如果是跳转表则在 IDA 找到跳转的真实偏移地址
+如果是跳转表则在 IDA 找到跳转的真实偏移地址。
 
 ```
 function printArg(addr) {
@@ -565,17 +569,11 @@ app 中加密结果
 ![word/media/image12.png](https://gitee.com/cyrus-studio/images/raw/master/2233a082b15cb4aa18144ce68d23e62f.png)
 
 
-# **打印调用堆栈**
+# 打印调用堆栈
 
 
 
 打印该函数的调用堆栈看看
-
-
-
-文档：[https://frida.re/docs/javascript-api/#Thread](https://frida.re/docs/javascript-api/#Thread)
-
-
 
 ```
 function getModuleByAddressSafe(address) {
@@ -629,6 +627,8 @@ function main() {
 
 setImmediate(main);
 ```
+相关文档：[https://frida.re/docs/javascript-api/#Thread](https://frida.re/docs/javascript-api/#Thread)
+
 
 
 附加到当前 app 并执行脚本
@@ -678,7 +678,7 @@ frida -H 127.0.0.1:1234 -F -l printStack.js
 ![word/media/image15.png](https://gitee.com/cyrus-studio/images/raw/master/a74610f9bd72cf12fab78fe1e9038a87.png)
 
 
-# **验证算法**
+# 验证算法
 
 
 
@@ -700,7 +700,7 @@ frida -H 127.0.0.1:1234 -F -l printStack.js
 
 
 
-# **Frida Trace**
+# Frida Trace
 
 
 
@@ -790,11 +790,11 @@ frida -H 127.0.0.1:1234 -F -l trace.js | tee trace.txt
 ![word/media/image18.png](https://gitee.com/cyrus-studio/images/raw/master/6b1f2f80184917ad1c88daabc38345e1.png)
 
 
-# **完整源码**
+# 完整源码
 
 
 
-完整源码地址：[https://github.com/CYRUS-STUDIO/FridaStalker](https://github.com/CYRUS-STUDIO/FridaStalker)
+开源地址：[https://github.com/CYRUS-STUDIO/frida_stalker](https://github.com/CYRUS-STUDIO/frida_stalker)
 
 
 
