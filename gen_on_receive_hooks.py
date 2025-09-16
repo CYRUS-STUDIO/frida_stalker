@@ -57,11 +57,13 @@ $hook_calls
 setImmediate(main);
 """)
 
+
 def sanitize_varname(modname):
     v = re.sub(r'[^0-9a-zA-Z_]', '_', modname)
     if re.match(r'^[0-9]', v):
         v = '_' + v
     return "base_" + v
+
 
 def parse_to_entries(text):
     """
@@ -82,6 +84,7 @@ def parse_to_entries(text):
             entries.append((mod, off, orig))
     return entries
 
+
 def unique_preserve_order(entries):
     """
     entries: list of (mod, off, orig_line)
@@ -96,6 +99,7 @@ def unique_preserve_order(entries):
         seen.add(key)
         out.append((mod, off, orig))
     return out
+
 
 def gen_js(src_path: Path, ordered_entries):
     # collect unique modules preserving first-appearance order
@@ -125,6 +129,7 @@ def gen_js(src_path: Path, ordered_entries):
     full = JS_HEADER.substitute(src=str(src_path)) + main
     return full
 
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python gen_frida_hooks_single_main.py <input.txt>")
@@ -144,12 +149,20 @@ def main():
     ordered = unique_preserve_order(entries)
     js_text = gen_js(in_path, ordered)
 
+    # output filename: <stem>_hooks.js
     out_path = in_path.with_name(in_path.stem + "_hooks.js")
+    # append frida command comment at the end
+    js_name = out_path.name
+    log_name = out_path.with_suffix(".txt").name
+    frida_line = f"\n// frida -H 127.0.0.1:1234 -F -l {js_name} -o {log_name}\n"
+    js_text = js_text + frida_line
+
     out_path.write_text(js_text, encoding='utf-8')
     print("Generated:", out_path)
     print("Entries (in order):")
     for mod, off, orig in ordered:
         print(f"  {mod} {off}  // {orig}")
+
 
 if __name__ == "__main__":
     main()
