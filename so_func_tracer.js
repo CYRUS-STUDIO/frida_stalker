@@ -154,8 +154,12 @@ function traceInstructionAndRegisters(targetModuleName, targetSymbol) {
 
 
 setImmediate(function () {
-    traceInstructionAndRegisters("libnative-lib.so", 0x26058)
+    // traceInstructionAndRegisters("libnative-lib.so", 0x26058)
+
+    // 秀动
+    traceInstructionAndRegisters("librsig.so", 0xB9384)
 });
 
 
-// frida -H 127.0.0.1:1234 -F -l so_func_tracer.js
+// frida -H 127.0.0.1:1234 -F -l so_func_tracer.js -o trace.txt
+// frida -H 127.0.0.1:1234 -F -l so_func_tracer.js | tee trace.txt

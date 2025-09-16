@@ -70,4 +70,6 @@ setImmediate(function () {
     trace("libnative-lib.so", 0x26058)
 });
 
-// frida -H 127.0.0.1:1234 -F -l so_func_instr_tracer.js
+
+// frida -H 127.0.0.1:1234 -F -l so_func_instr_tracer.js -o trace.txt
+// frida -H 127.0.0.1:1234 -F -l so_func_instr_tracer.js | tee trace.txt

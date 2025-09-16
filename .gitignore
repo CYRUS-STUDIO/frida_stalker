@@ -6,3 +6,8 @@
 *.til
 trace.txt
 trace.txt~
+on_call_summary.txt
+on_call_summary_hooks.js
+on_receive.txt
+on_receive_hooks.js
+libaes.so

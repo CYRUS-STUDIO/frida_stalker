@@ -1,12 +1,34 @@
 function onCallSummary() {
-    // 目标 so
-    var soName = "libaes.so"
-    // 目标 so 基址
-    var baseAddress = Module.findBaseAddress(soName);
-    // 目标函数地址 = 基址 + 偏移
-    var targetAddr = baseAddress.add(0x23AD0);
 
-    console.log('Target function found at:', targetAddr);
+    // 目标 so
+    // let soName = "libaes.so"
+    // // 函数偏移
+    // let offset = 0x23AD0
+
+    // 秀动
+    // 目标 so
+    let soName = "librsig.so"
+    // 函数偏移
+    let offset = 0xB9384
+
+    // 查找基址
+    let baseAddress = Module.findBaseAddress(soName);
+
+    if (!baseAddress) {
+        console.log("[ERROR] cannot find module:", soName);
+        return
+    }
+
+    // 目标函数地址 = 基址 + 偏移
+    let targetAddr = baseAddress.add(offset);
+
+    // 打印详细信息（十六进制）
+    console.log("===== target info =====");
+    console.log("soName     :", soName);
+    console.log("offset     :", "0x" + offset.toString(16));
+    console.log("baseAddress:", baseAddress);
+    console.log("targetAddr :", targetAddr);
+    console.log("=======================");
 
     Interceptor.attach(targetAddr, {
         onEnter: function (args) {
@@ -42,3 +64,6 @@ function onCallSummary() {
 
 // setImmediate()：确保代码在 Frida 环境准备好后执行。
 setImmediate(onCallSummary)
+
+
+// frida -H 127.0.0.1:1234 -F -l on_call_summary.js -o on_call_summary.txt
